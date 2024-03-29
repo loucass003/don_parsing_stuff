@@ -69,6 +69,8 @@ const init = async () => {
 			options: {}
 		}
 	], {}));
+
+	console.log('DONE')
 }
 
 init();
