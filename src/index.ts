@@ -1,4 +1,4 @@
-import { writeFile } from 'fs/promises';
+import { appendFile, writeFile } from 'fs/promises';
 import { readFile } from 'fs/promises'
 import xlsx from 'node-xlsx';
 import { resolve } from 'path';
@@ -10,7 +10,7 @@ const loadFile = async (meta: string[], path: string) => {
 		const [page0] = sheet;
 		const [line0, _, line2, _2, _3, ...others] = page0.data;
 		const [buildingName] = line0
-		const freq = line2.find((cell) => cell?.includes('FREQUENCY')).replace(/FREQUENCY:\s+(\S+)/, '$1');
+		const freq = line2.find((cell) => cell?.includes('FREQUENCY')).replace(/FREQUENCY\s+(:|-)\s+(\S+)/, '$1').trim();
 		const table = [];
 		for (const [index, line] of others.entries()) {
 			if (line.length !== 9)
@@ -51,7 +51,7 @@ const init = async () => {
 		if (res) {
 			finalTable.push(...res as string[][]);
 		} else {
-			console.log(`Error loading ${path}`);
+			await appendFile('./error.log', `Error loading ${path}`, {  flush: true });
 		}
 	}
 
