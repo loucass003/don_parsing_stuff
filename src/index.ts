@@ -12,19 +12,23 @@ const init = async () => {
 	const loadFile = async (meta: string[], path: string) => {
 		try {
 			const sheet = xlsx.parse(await readFile(path));
-			const page0 = sheet.find((page) => !!page);
-			const [line0, _, line2, _2, _3, ...others] = page0.data;
-			const [buildingName] = line0
-			const freq = line2.find((cell) => cell?.includes('FREQUENCY') || cell?.includes('FREQ'))?.replace(/FREQ.*\s+(:|-)\s+(\S+)/, '$2').trim() || 'UNKNOWN';
 			const table = [];
-	
-			for (const [index, line] of others.entries()) {
-				if (line.length !== 9)
-					continue;
-				if (!Number.isInteger(line[0]))
-					continue;
-				table.push([...meta, buildingName, freq, ...line])
-			}
+			sheet.forEach((page, pageIndex) => {
+				if (page.data.length < 4) {
+					errors.push([...meta, `Invaid Header on page ${pageIndex + 1}, File is formatated incorectly`])
+					return;
+				}
+				const [line0, _, line2, _2, _3, ...others] = page.data;
+				const [buildingName] = line0
+				const freq = line2.find((cell) => cell?.includes('FREQUENCY') || cell?.includes('FREQ'))?.replace(/FREQ.*\s+(:|-)\s+(\S+)/, '$2').trim() || 'UNKNOWN';
+				for (const [index, line] of others.entries()) {
+					if (line.length !== 9)
+						continue;
+					if (!Number.isInteger(line[0]))
+						continue;
+					table.push([...meta, buildingName, freq, ...line])
+				}
+			})
 			if (table.length === 0) {
 				errors.push([...meta, 'Formatted incorrectly'])
 				return null;
