@@ -39,6 +39,7 @@ const init = async () => {
 	
 	const bar1 = new cliProgress.SingleBar({
 		hideCursor: true,
+		etaBuffer: 100,
 		format: ' {bar} | {id} | {value}/{total} | ETA: {eta_formatted}',
 	}, cliProgress.Presets.shades_classic);
 
