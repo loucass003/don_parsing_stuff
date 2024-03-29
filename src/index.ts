@@ -4,35 +4,38 @@ import xlsx from 'node-xlsx';
 import { resolve } from 'path';
 import cliProgress from 'cli-progress';
 
-const loadFile = async (meta: string[], path: string) => {
-	try {
-		const sheet = xlsx.parse(await readFile(path));
-		const [page0] = sheet;
-		const [line0, _, line2, _2, _3, ...others] = page0.data;
-		const [buildingName] = line0
-		const freq = line2.find((cell) => cell?.includes('FREQUENCY')).replace(/FREQUENCY\s+(:|-)\s+(\S+)/, '$1').trim();
-		const table = [];
-		for (const [index, line] of others.entries()) {
-			if (line.length !== 9)
-				continue;
-			if (!Number.isInteger(line[0]))
-				continue;
-			table.push([...meta, buildingName, freq, ...line])
-		}
-		if (table.length === 0) {
-			await appendFile('./error.log', `[${path}] table is empty\n`, {  flush: true });
-			return null;
-		}
-		return table;
-	} catch (e: any) {
-		await appendFile('./error.log', `[${path}] ${e?.message || 'unkown error'}\n`, {  flush: true });
-		return null
-	}
-}
 
 const init = async () => {
 
-	rm('./error.log').catch(() => null)
+	const errors = []
+
+	const loadFile = async (meta: string[], path: string) => {
+		try {
+			const sheet = xlsx.parse(await readFile(path));
+			const [page0] = sheet;
+			const [line0, _, line2, _2, _3, ...others] = page0.data;
+			const [buildingName] = line0
+			const freq = line2.find((cell) => cell?.includes('FREQUENCY') || cell?.includes('FREQ'))?.replace(/FREQ.*\s+(:|-)\s+(\S+)/, '$2').trim() || 'UNKNOWN';
+			const table = [];
+	
+			for (const [index, line] of others.entries()) {
+				if (line.length !== 9)
+					continue;
+				if (!Number.isInteger(line[0]))
+					continue;
+				table.push([...meta, buildingName, freq, ...line])
+			}
+			if (table.length === 0) {
+				errors.push([...meta, 'Formatted incorrectly'])
+				return null;
+			}
+			return table;
+		} catch (e: any) {
+			errors.push([...meta, `${e?.message || 'unkown error'}`])
+			return null
+		}
+	}
+	
 	
 	const bar1 = new cliProgress.SingleBar({
 		hideCursor: true,
@@ -48,7 +51,7 @@ const init = async () => {
 
 	const lines = page0.data.slice(1);
 
-	bar1.start(lines.length, 0);
+	bar1.start(lines.findIndex((cells) => cells.length == 0) + 1, 0);
 
 	for (const [index, line] of lines.entries()) {
 		const [id, name, ar, path, date] = line;
@@ -56,7 +59,21 @@ const init = async () => {
 		const res = await loadFile([id, name, ar, path, date], path);
 		if (res) {
 			finalTable.push(...res as string[][]);
-		} 
+		} else {
+			await writeFile('errors.xls', xlsx.build([
+				{
+					name: 'sheet0',
+					data: [
+						['service site #', 'name of location', 'ar#', 'file path', 'date last invoiced', 'error'],
+						...errors,
+					],
+					options: {}
+				}
+			], {}));
+		}
+
+		if (line.length === 0 || !Number.isInteger(line[0]))
+			break;
 	}
 
 	bar1.stop();
