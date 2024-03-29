@@ -1,4 +1,4 @@
-import { appendFile, writeFile } from 'fs/promises';
+import { appendFile, rm, writeFile } from 'fs/promises';
 import { readFile } from 'fs/promises'
 import xlsx from 'node-xlsx';
 import { resolve } from 'path';
@@ -19,15 +19,21 @@ const loadFile = async (meta: string[], path: string) => {
 				continue;
 			table.push([...meta, buildingName, freq, ...line])
 		}
-		if (table.length === 0)
+		if (table.length === 0) {
+			await appendFile('./error.log', `[${path}] table is empty\n`, {  flush: true });
 			return null;
+		}
 		return table;
-	} catch {
+	} catch (e: any) {
+		await appendFile('./error.log', `[${path}] ${e?.message || 'unkown error'}\n`, {  flush: true });
 		return null
 	}
 }
 
 const init = async () => {
+
+	rm('./error.log').catch(() => null)
+	
 	const bar1 = new cliProgress.SingleBar({
 		hideCursor: true,
 		format: ' {bar} | {id} | {value}/{total} | ETA: {eta_formatted}',
@@ -50,9 +56,7 @@ const init = async () => {
 		const res = await loadFile([id, name, ar, path, date], path);
 		if (res) {
 			finalTable.push(...res as string[][]);
-		} else {
-			await appendFile('./error.log', `Error loading ${path}`, {  flush: true });
-		}
+		} 
 	}
 
 	bar1.stop();
