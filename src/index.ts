@@ -12,7 +12,7 @@ const init = async () => {
 	const loadFile = async (meta: string[], path: string) => {
 		try {
 			const sheet = xlsx.parse(await readFile(path));
-			const [page0] = sheet;
+			const page0 = sheet.find((page) => !!page);
 			const [line0, _, line2, _2, _3, ...others] = page0.data;
 			const [buildingName] = line0
 			const freq = line2.find((cell) => cell?.includes('FREQUENCY') || cell?.includes('FREQ'))?.replace(/FREQ.*\s+(:|-)\s+(\S+)/, '$2').trim() || 'UNKNOWN';
