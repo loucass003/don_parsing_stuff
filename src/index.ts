@@ -1,4 +1,4 @@
-import { appendFile, rm, writeFile } from 'fs/promises';
+import { writeFile } from 'fs/promises';
 import { readFile } from 'fs/promises'
 import xlsx from 'node-xlsx';
 import { resolve } from 'path';
@@ -14,6 +14,9 @@ const init = async () => {
 			const sheet = xlsx.parse(await readFile(path));
 			const table = [];
 			sheet.forEach((page, pageIndex) => {
+				if (page.data.length === 0) {
+					return;
+				}
 				if (page.data.length < 4) {
 					errors.push([...meta, `Invaid Header on page ${pageIndex + 1}, File is formatated incorectly`])
 					return;
@@ -22,11 +25,11 @@ const init = async () => {
 				const [buildingName] = line0
 				const freq = line2.find((cell) => cell?.includes('FREQUENCY') || cell?.includes('FREQ'))?.replace(/FREQ.*\s+(:|-)\s+(\S+)/, '$2').trim() || 'UNKNOWN';
 				for (const [index, line] of others.entries()) {
-					if (line.length !== 9)
+					if (line.length >= 9)
 						continue;
 					if (!Number.isInteger(line[0]))
 						continue;
-					table.push([...meta, buildingName, freq, ...line])
+					table.push([...meta, buildingName, freq, ...line.slice(0, 9)])
 				}
 			})
 			if (table.length === 0) {
