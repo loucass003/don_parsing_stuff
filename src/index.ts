@@ -3,13 +3,14 @@ import { readFile } from 'fs/promises'
 import xlsx from 'node-xlsx';
 import { resolve } from 'path';
 import cliProgress from 'cli-progress';
+import { StaticPool } from 'node-worker-threads-pool';
 
 
 const init = async () => {
-
-	const errors = []
+	const allerrors = []
 
 	const loadFile = async (meta: string[], path: string) => {
+		const errors = []
 		try {
 			const sheet = xlsx.parse(await readFile(path));
 			const table = [];
@@ -34,16 +35,20 @@ const init = async () => {
 			})
 			if (table.length === 0) {
 				errors.push([...meta, 'Formatted incorrectly'])
-				return null;
+				return errors;
 			}
 			return table;
 		} catch (e: any) {
 			errors.push([...meta, `${e?.message || 'unkown error'}`])
-			return null
+			return errors
 		}
 	}
-	
-	
+
+	const staticPool = new StaticPool({
+		size: 16,
+		task: loadFile
+	});
+
 	const bar1 = new cliProgress.SingleBar({
 		hideCursor: true,
 		etaBuffer: 100,
@@ -64,16 +69,17 @@ const init = async () => {
 	for (const [index, line] of lines.entries()) {
 		const [id, name, ar, path, date] = line;
 		bar1.update(index, { id })
-		const res = await loadFile([id, name, ar, path, date], path);
-		if (res) {
+		const res = await staticPool.exec([id, name, ar, path, date], path);
+		if (res.length === 0) {
 			finalTable.push(...res as string[][]);
 		} else {
+			allerrors.push(...res)
 			await writeFile('errors.xls', xlsx.build([
 				{
 					name: 'sheet0',
 					data: [
 						['service site #', 'name of location', 'ar#', 'file path', 'date last invoiced', 'error'],
-						...errors,
+						...allerrors,
 					],
 					options: {}
 				}
