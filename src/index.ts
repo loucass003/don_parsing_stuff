@@ -20,7 +20,7 @@ function chunkArray(array: any[], chunkSize: number): any[][] {
 
 const init = async () => {
 	
-	const pool = workerpool.pool(__dirname + '/worker.js', { maxWorkers: 256, workerType: 'process' });
+	const pool = workerpool.pool(__dirname + '/worker.js', { maxWorkers: 24, workerType: 'thread' });
 
 	const bar1 = new cliProgress.SingleBar({
 		hideCursor: true,
@@ -40,7 +40,7 @@ const init = async () => {
 	
 	const allerrors = []
 	
-	const chunks = chunkArray(lines, 100);
+	const chunks = chunkArray(lines, 50);
 	bar1.start(chunks.length, 0);
 
 	for (const [index, chunk] of chunks.entries()) {
@@ -65,25 +65,20 @@ const init = async () => {
 				options: {}
 			}
 		], {}));
+
+		await writeFile('out.xls', xlsx.build([
+			{
+				name: 'sheet0',
+				data: [
+					['service site #', 'name of location', 'ar#', 'file path', 'date last invoiced', 'building name', 'frequency', 'order', 'MFG.', 'SIZE', 'TYPE', 'MFG DATE', 'SERIAL #', 'Last Hydro', 'Last 6yr Test', 'LOCATION', 'STATUS'],
+					...finalTable,
+				],
+				options: {}
+			}
+		], {}));
 	}
-	
-	
 	await pool.terminate();
 	bar1.stop();
-
-	await new Promise((resolve) => setTimeout(() => resolve(true), 3000));
-
-	writeFile('out.xls', xlsx.build([
-		{
-			name: 'sheet0',
-			data: [
-				['service site #', 'name of location', 'ar#', 'file path', 'date last invoiced', 'building name', 'frequency', 'order', 'MFG.', 'SIZE', 'TYPE', 'MFG DATE', 'SERIAL #', 'Last Hydro', 'Last 6yr Test', 'LOCATION', 'STATUS'],
-				...finalTable,
-			],
-			options: {}
-		}
-	], {}));
-
 	console.log('DONE')
 }
 
