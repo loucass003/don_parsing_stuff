@@ -7,7 +7,7 @@ import workerpool from 'workerpool';
 
 const init = async () => {
 	
-	const pool = workerpool.pool(__dirname + '/worker.js', { maxWorkers: 256 });
+	const pool = workerpool.pool(__dirname + '/worker.js', { maxWorkers: 256, workerType: 'process' });
 
 	const bar1 = new cliProgress.SingleBar({
 		hideCursor: true,
