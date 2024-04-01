@@ -5,6 +5,19 @@ import { resolve } from 'path';
 import cliProgress from 'cli-progress';
 import workerpool from 'workerpool';
 
+
+function chunkArray(array: any[], chunkSize: number): any[][] {
+	const chunkedArray: any[][] = [];
+	let index = 0;
+
+	while (index < array.length) {
+		chunkedArray.push(array.slice(index, index + chunkSize));
+		index += chunkSize;
+	}
+
+	return chunkedArray;
+}
+
 const init = async () => {
 	
 	const pool = workerpool.pool(__dirname + '/worker.js', { maxWorkers: 256, workerType: 'process' });
@@ -12,7 +25,7 @@ const init = async () => {
 	const bar1 = new cliProgress.SingleBar({
 		hideCursor: true,
 		etaBuffer: 100,
-		format: ' {bar} | {id} | {value}/{total} | ETA: {eta_formatted}',
+		format: ' {bar} | {value}/{total} | ETA: {eta_formatted}',
 	}, cliProgress.Presets.shades_classic);
 
 
@@ -22,35 +35,38 @@ const init = async () => {
 
 	const finalTable: string[][] = [];
 
-	const lines = page0.data.slice(1);
-
-	bar1.start(lines.findIndex((cells) => cells.length == 0) + 1, 0);
-
-
+	let lines = page0.data.slice(1);
+	lines = lines.slice(0, lines.findIndex((cells) => cells.length == 0) + 1);
+	
 	const allerrors = []
-	for (const [index, line] of lines.entries()) {
-		const [id, name, ar, path, date] = line;
-		bar1.update(index, { id })
-		const { status, data } = await pool.exec('loadFile', [[id, name, ar, path, date], path]);
-		if (status === 'ok') {
-			finalTable.push(...data as string[][]);
-		} else {
-			allerrors.push(...data)
-			await writeFile('errors.xls', xlsx.build([
-				{
-					name: 'sheet0',
-					data: [
-						['service site #', 'name of location', 'ar#', 'file path', 'date last invoiced', 'error'],
-						...allerrors,
-					],
-					options: {}
-				}
-			], {}));
+	
+	const chunks = chunkArray(lines, 100);
+	bar1.start(chunks.length, 0);
+
+	for (const [index, chunk] of chunks.entries()) {
+		bar1.update(index)
+		const { batchErrors, batchTable } = await pool.exec('loadFiles', [chunk])
+
+		if (batchTable.length > 0) {
+			finalTable.push(...batchTable)
 		}
 
-		if (line.length === 0 || !Number.isInteger(line[0]))
-			break;
+		if (batchErrors.length > 0) {
+			allerrors.push(...batchErrors)
+		}
+
+		await writeFile('errors.xls', xlsx.build([
+			{
+				name: 'sheet0',
+				data: [
+					['service site #', 'name of location', 'ar#', 'file path', 'date last invoiced', 'error'],
+					...allerrors,
+				],
+				options: {}
+			}
+		], {}));
 	}
+	
 	
 	await pool.terminate();
 	bar1.stop();
